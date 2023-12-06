@@ -1,37 +1,87 @@
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <string.h>
-# ifndef BUFFER_SIZE
-#  define BUFFER_SIZE 100
-# endif
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   get_next_line.c                                    :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: carlos-m <carlos-m@student.42madrid.com>   +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2023/11/29 11:17:12 by carlos-m          #+#    #+#             */
+/*   Updated: 2023/11/29 11:17:14 by carlos-m         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
 
-char *ft_realloc(char *aux, int tam)
+#include "get_next_line.h"
+
+char	*nl_exception(char **buff)
 {
 	char	*sol;
-	int		i;
-	char	*aux_aux;
+	int		cont;
+	char	*aux_final_buff;
 
-	if (!aux)
-		aux = strdup("");
-	aux_aux = aux;
-	tam++;
-	sol = malloc(tam + 1);
-	if (!sol)
-		return (NULL);
-	sol[tam] = '\0';
-	i = 0;
-	while (i < (tam - 1) && *aux)
+	sol = NULL;
+	cont = 0;
+	while ((*buff)[cont] != '\n')
 	{
-		sol[i] = *aux;
-		aux++;
-		i++;
+		sol = ft_realloc(sol, cont, (*buff)[cont]);
+		cont++;
 	}
-	free(aux_aux);
+	sol = ft_realloc(sol, cont, (*buff)[cont]);
+	if ((*buff)[cont + 1])
+		aux_final_buff = ft_strdup(ft_strchr(*buff, '\n') + 1);
+	else
+		return (free(*buff), *buff = NULL, sol);
+	free(*buff);
+	*buff = aux_final_buff;
+	return (sol);
+}
+
+char	*ft_has_jl(char **buff, char **sol, int aux_cont)
+{
+	char	*aux_final_buff;
+
+	aux_final_buff = NULL;
+	if ((*buff)[aux_cont + 1])
+		aux_final_buff = ft_strdup(&(*buff)[aux_cont + 1]);
+	free(*buff);
+	*buff = aux_final_buff;
+	return (*sol);
+}
+
+char	*ft_read(int numbytes, char **buff, char **sol, int fd)
+{
+	int		aux_cont;
+	int		cont;
+
+	cont = ft_strlen(*sol);
+	while (numbytes > 0)
+	{
+		aux_cont = 0;
+		while ((*buff)[aux_cont])
+		{
+			*sol = ft_realloc(*sol, cont, (*buff)[aux_cont]);
+			if ((*buff)[aux_cont] == '\n')
+				return (ft_has_jl(&(*buff), &(*sol), aux_cont));
+			cont++;
+			aux_cont++;
+		}
+		free(*buff);
+		*buff = ft_calloc(sizeof(char), BUFFER_SIZE + 1);
+		if (!(*buff))
+			return (NULL);
+		numbytes = read(fd, *buff, BUFFER_SIZE);
+	}
+	free(*buff);
+	*buff = NULL;
+	return (*sol);
+}
+
+char	*add_buff(char **buff)
+{
+	char	*sol;
+
+	sol = ft_strdup(*buff);
+	free(*buff);
+	*buff = ft_calloc(sizeof(char), BUFFER_SIZE + 1);
 	return (sol);
 }
 
@@ -39,79 +89,30 @@ char	*get_next_line(int fd)
 {
 	static char	*buff;
 	char		*sol;
-	char		*aux_buff;
-	char		*aux_final_buff;
-	int			cont;
 	int			numbytes;
 
 	if (BUFFER_SIZE <= 0 || fd < 0)
 		return (NULL);
-	if (!buff) // crear asignar NULL a sol, crear buffer e iniciar el contador a o;
+	if (!buff)
 	{
-		buff = malloc(BUFFER_SIZE + 1);
-		buff[BUFFER_SIZE] = '\0';
+		buff = ft_calloc(sizeof(char), BUFFER_SIZE + 1);
 		sol = NULL;
-		cont = 0;
 	}
 	else
 	{
-		if (!strchr(buff, '\n')) // No hay \n dentro de buff por lo que guardamos el contenido de buffer en sol,
-		{						 //Liberamos buffer e iniciamos el contador en el tamaño de sol
-			sol = strdup(buff);
-			cont = strlen(sol) - 1;
-			free(buff);
-			buff = malloc(BUFFER_SIZE + 1);
-			buff[BUFFER_SIZE] = '\0';
-		}
-		else					//Hay \n en el buffer. guardamos en sol lo que hay hasta \n y
-		{						//modificamos el buffer para que tenga solo el resto
-			sol = NULL;
-			cont = 0;
-			while (buff[cont] != '\n')
-			{
-				sol = ft_realloc(sol, cont);
-				sol[cont] = buff[cont];
-				cont++;
-			}
-			sol = ft_realloc(sol, cont);
-			sol[cont] = buff[cont];
-			aux_buff = strdup(strchr(buff, '\n') + 1);
-			free(buff);
-			buff = aux_buff;
-			return (sol);
-		}
-	} // Ya solo queda leer hasta encontrar un \n o llegar al final del archivo
-	numbytes = read(fd, buff, BUFFER_SIZE);
-	if (numbytes <= 0)
-		return (free(buff), sol);
-	aux_final_buff = NULL;
-	while (numbytes > 0)
-	{
-		aux_buff = buff;
-		while (*buff)
-		{
-			sol = ft_realloc(sol, cont);
-			sol[cont] = *buff;
-			if (*buff == '\n')
-			{
-				if (*(buff + 1) != '\0')
-					aux_final_buff = strdup(buff + 1);
-				buff = aux_buff;
-				free(buff);
-				buff = aux_final_buff;
-				return (sol);
-			}
-			cont++;
-			buff++;
-		}
-		buff = aux_buff;
-		free(buff);
-		numbytes = read(fd, buff, BUFFER_SIZE);
+		if (!ft_strchr(buff, '\n'))
+			sol = add_buff(&buff);
+		else
+			return (nl_exception(&buff));
 	}
-	free(buff);
-	return (sol);
+	numbytes = read(fd, buff, BUFFER_SIZE);
+	if (numbytes == -1)
+		return (free(buff), free(sol), buff = NULL, NULL);
+	if (numbytes <= 0)
+		return (free(buff), buff = NULL, sol);
+	return (ft_read(numbytes, &buff, &sol, fd));
 }
-
+/*
 int main(void)
 {
 	int fd = open("prueba.txt", O_RDONLY);
@@ -123,3 +124,4 @@ int main(void)
 	free(f);
 	return (0);
 }
+*/
